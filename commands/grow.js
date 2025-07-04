@@ -173,61 +173,39 @@ module.exports = {
 
             const componentRows = [];
 
-            for (let i = 0; i < userProfile.plots.lenth; i++) {
+            // --- REWRITTEN LOOP FOR ROBUSTNESS ---
+            for (let i = 0; i < userProfile.plots.length; i++) {
                 const plot = userProfile.plots[i];
-
+                const actionRow = new ActionRowBuilder(); // Create a new row for each plot
                 let plotStatus;
-                // Create a new row of buttons for each plot
-                const actionRow = new ActionRowBuilder();
-
+                
                 if (plot.hasPlant) {
                     const plantData = allItems.get(plot.plantId);
                     const harvestReadyTime = new Date(new Date(plot.plantedAt).getTime() + plantData.growTime);
                     const isReady = new Date() >= harvestReadyTime;
                     
-                    // Determine watering status
                     const witherTime = 24 * 60 * 60 * 1000;
                     const timeSinceWatered = Date.now() - new Date(plot.lastWatered).getTime();
-                    const needsWater = timeSinceWatered > witherTime / 2; // Example: show water button if >12 hours have passed
+                    const needsWater = timeSinceWatered > witherTime / 2; // Needs water after 12 hours
 
                     plotStatus = `**${plantData.name}**\n`;
                     plotStatus += isReady ? "✅ Ready to Harvest!" : `Ready <t:${Math.floor(harvestReadyTime.getTime() / 1000)}:R>`;
 
-                    // Water Button
                     actionRow.addComponents(
-                        new ButtonBuilder()
-                            .setCustomId(`water-${i}`) // e.g., water-0
-                            .setLabel('Water')
-                            .setStyle(ButtonStyle.Primary)
-                            .setEmoji('💧')
-                            .setDisabled(!needsWater) // Disable if recently watered
+                        new ButtonBuilder().setCustomId(`water-${i}`).setLabel('Water').setStyle(ButtonStyle.Primary).setEmoji('💧').setDisabled(!needsWater),
+                        new ButtonBuilder().setCustomId(`harvest-${i}`).setLabel('Harvest').setStyle(ButtonStyle.Success).setEmoji('🧑‍🌾').setDisabled(!isReady)
                     );
-
-                    // Harvest Button
-                    actionRow.addComponents(
-                        new ButtonBuilder()
-                            .setCustomId(`harvest-${i}`) // e.g., harvest-0
-                            .setLabel('Harvest')
-                            .setStyle(ButtonStyle.Success)
-                            .setEmoji('🧑‍🌾')
-                            .setDisabled(!isReady) // Disable if not ready
-                    );
-
                 } else {
                     plotStatus = "Empty 🌱";
-                    // Plant Button (disabled for now, could be a future feature)
                      actionRow.addComponents(
-                        new ButtonBuilder()
-                            .setCustomId(`plant-${i}`)
-                            .setLabel('Plant')
-                            .setStyle(ButtonStyle.Secondary)
-                            .setEmoji('🌿')
-                            .setDisabled(true)
+                        new ButtonBuilder().setCustomId(`plant-${i}`).setLabel('Plant').setStyle(ButtonStyle.Secondary).setEmoji('🌿').setDisabled(true)
                     );
                 }
+
                 statusEmbed.addFields({ name: `Plot ${i + 1}`, value: plotStatus, inline: true });
                 componentRows.push(actionRow);
             }
+            // --- END OF REWRITE ---
 
             return interaction.editReply({ embeds: [statusEmbed], components: componentRows });
         }
