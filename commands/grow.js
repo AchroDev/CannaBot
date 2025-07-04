@@ -60,21 +60,22 @@ module.exports = {
         const subcommand = interaction.options.getSubcommand();
 
         if (subcommand === 'plant') {
+            await interaction.deferReply();
             const seedId = interaction.options.getString('seed');
             const seedData = allItems.get(seedId);
 
             if (!seedData || seedData.type !== 'seed') {
-                return interaction.reply({ content: 'That is not a valid seed.', flags: [MessageFlags.Ephemeral] });
+                return interaction.editReply({ content: 'That is not a valid seed.', flags: [MessageFlags.Ephemeral] });
             }
 
             const seedInInventory = userProfile.inventory.find(i => i.name === seedData.name);
             if (!seedInInventory || seedInInventory.quantity < 1) {
-                return interaction.reply({ content: `You don't have any ${seedData.name} to plant!`, flags: [MessageFlags.Ephemeral] });
+                return interaction.editReply({ content: `You don't have any ${seedData.name} to plant!`, flags: [MessageFlags.Ephemeral] });
             }
 
             const plotIndex = userProfile.plots.findIndex(p => !p.hasPlant);
             if (plotIndex === -1) {
-                return interaction.reply({ content: 'You have no empty plots!', flags: [MessageFlags.Ephemeral] });
+                return interaction.editReply({ content: 'You have no empty plots!', flags: [MessageFlags.Ephemeral] });
             }
 
             // Consume one seed
@@ -92,7 +93,7 @@ module.exports = {
             const readyTime = new Date(Date.now() + seedData.growTime);
             await userProfile.save();
             
-            return interaction.reply(`You've planted **${seedData.name}** in plot ${plotIndex + 1}. It will be ready <t:${Math.floor(readyTime.getTime() / 1000)}:R>.`);
+            return interaction.editReply(`You've planted **${seedData.name}** in plot ${plotIndex + 1}. It will be ready <t:${Math.floor(readyTime.getTime() / 1000)}:R>.`);
         } 
         
         else if (subcommand === 'harvest') {
@@ -140,7 +141,7 @@ module.exports = {
 
         // --- LOGIC FOR THE NEW STATUS SUBCOMMAND ---
         else if (subcommand === 'status') {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
             if (!userProfile.plots || userProfile.plots.length === 0) {
                 return interaction.editReply("You don't have any grow plots yet. Try planting a seed!");
