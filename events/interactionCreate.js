@@ -1,44 +1,27 @@
 const { Events, MessageFlags } = require('discord.js');
+const User = require('../models/User');
+const allItems = require('../data/items');
+const { checkLevelUp } = require('../utils/experience');
 
 module.exports = {
 	name: Events.InteractionCreate,
 	async execute(interaction) {
-        const command = interaction.client.commands.get(interaction.commandName);
-
-        if (!command) {
-			console.error(`No command matching ${interaction.commandName} was found.`);
-			return;
-		}
-
-        // --- Handle Autocomplete ---
+        
+        // --- Handle Autocomplete Interactions ---
         if (interaction.isAutocomplete()) {
-            if (command.autocomplete) {
-                try {
-                    await command.autocomplete(interaction);
-                } catch (error) {
-                    console.error(error);
-                }
-            }
-            return;
-        }
+            const command = interaction.client.commands.get(interaction.commandName);
+            if (!command || !command.autocomplete) return;
 
-        // --- Handle Slash Commands ---
-		if (interaction.isChatInputCommand()) {
             try {
-                await command.execute(interaction);
+                await command.autocomplete(interaction);
             } catch (error) {
-                console.error(`Error executing ${interaction.commandName}`);
-                console.error(error);
-                if (interaction.replied || interaction.deferred) {
-                    await interaction.followUp({ content: 'There was an error while executing this command!', flags: [MessageFlags.Ephemeral] });
-                } else {
-                    await interaction.reply({ content: 'There was an error while executing this command!', flags: [MessageFlags.Ephemeral] });
-                }
+                console.error('Autocomplete Error:', error);
             }
         }
-
+        
         // --- Handle Button Interactions ---
         else if (interaction.isButton()) {
+            // No need to get a command, we handle the logic directly.
             const [action, plotIndexStr] = interaction.customId.split('-');
             const plotIndex = parseInt(plotIndexStr, 10);
 
@@ -52,28 +35,27 @@ module.exports = {
                 return interaction.reply({ content: "This plot does not exist.", flags: [MessageFlags.Ephemeral] });
             }
 
-            // --- WATER ACTION ---
+            // Water Action
             if (action === 'water') {
-                if (!plot.hasPlant) {
-                    return interaction.reply({ content: "There's nothing to water in this plot.", flags: [MessageFlags.Ephemeral] });
-                }
+                if (!plot.hasPlant) return interaction.reply({ content: "There's nothing to water in this plot.", flags: [MessageFlags.Ephemeral] });
+                
                 plot.lastWatered = new Date();
                 await userProfile.save();
-                return interaction.reply({ content: `You watered your plant in plot ${plotIndex + 1}! 💧`, flags: [MessageFlags.Ephemeral] });
+                await interaction.update({ content: `You watered your plant in plot ${plotIndex + 1}! 💧`, components: [] });
+                return; // Use deferUpdate/update and return early
             }
 
-            // --- HARVEST ACTION ---
+            // Harvest Action
             if (action === 'harvest') {
-                if (!plot.hasPlant) {
-                    return interaction.reply({ content: "There's nothing to harvest in this plot.", flags: [MessageFlags.Ephemeral] });
-                }
+                if (!plot.hasPlant) return interaction.reply({ content: "There's nothing to harvest here.", flags: [MessageFlags.Ephemeral] });
 
                 const plantData = allItems.get(plot.plantId);
                 const witherTime = 24 * 60 * 60 * 1000;
                 if (Date.now() - new Date(plot.lastWatered).getTime() > witherTime) {
                     userProfile.plots[plotIndex] = { hasPlant: false, plantId: null, plantedAt: null, lastWatered: null };
                     await userProfile.save();
-                    return interaction.reply({ content: `Your **${plantData.name}** in plot ${plotIndex + 1} dried up and died. 🏜️`, flags: [MessageFlags.Ephemeral] });
+                    await interaction.update({ content: `Your **${plantData.name}** in plot ${plotIndex + 1} dried up and died. 🏜️`, components: [] });
+                    return;
                 }
 
                 const harvestReadyTime = new Date(new Date(plot.plantedAt).getTime() + plantData.growTime);
@@ -94,11 +76,32 @@ module.exports = {
                 await checkLevelUp(interaction, userProfile);
                 await userProfile.save();
 
-                return interaction.reply({ content: `You harvested your **${plantData.name}** from plot ${plotIndex + 1} and received ${plantData.reward} coins and ${plantData.xp} XP!`, flags: [MessageFlags.Ephemeral] });
+                // Using .update() removes the buttons from the original message after an action is taken.
+                await interaction.update({ content: `You harvested your **${plantData.name}** from plot ${plotIndex + 1}!`, components: [] });
+                return;
+            }
+        }
+
+        // --- Handle Slash Command Interactions ---
+        else if (interaction.isChatInputCommand()) {
+            const command = interaction.client.commands.get(interaction.commandName);
+
+            if (!command) {
+                console.error(`No command matching ${interaction.commandName} was found.`);
+                return;
             }
 
-            // Acknowledge the interaction to prevent it from failing
-            await interaction.deferUpdate();
+            try {
+                await command.execute(interaction);
+            } catch (error) {
+                console.error(`Error executing ${interaction.commandName}`);
+                console.error(error);
+                if (interaction.replied || interaction.deferred) {
+                    await interaction.followUp({ content: 'There was an error while executing this command!', flags: [MessageFlags.Ephemeral] });
+                } else {
+                    await interaction.reply({ content: 'There was an error while executing this command!', flags: [MessageFlags.Ephemeral] });
+                }
+            }
         }
 	},
 };
