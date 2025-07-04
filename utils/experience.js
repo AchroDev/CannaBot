@@ -8,19 +8,19 @@ function calculateRequiredXp(level) {
 
 // This function handles the actual level-up check and process.
 async function checkLevelUp(interaction, userProfile) {
-    const requiredXp = calculateRequiredXp(userProfile.level);
+    // --- THIS IS THE FIX ---
+    let requiredXp = calculateRequiredXp(userProfile.level); // Use let instead of const
     let leveledUp = false;
 
-    // A while loop is used to handle multi-level ups from a single XP gain.
     while (userProfile.xp >= requiredXp) {
         leveledUp = true;
         userProfile.level += 1;
-        userProfile.xp -= requiredXp; // Subtract this level's requirement, don't reset to 0.
+        userProfile.xp -= requiredXp;
 
-        const levelUpReward = userProfile.level * 100; // Reward of 100 coins per level.
+        const levelUpReward = userProfile.level * 100;
         userProfile.coins += levelUpReward;
 
-        // Re-calculate required XP for the new level for the next loop iteration.
+        // This line now correctly reassigns the 'let' variable
         requiredXp = calculateRequiredXp(userProfile.level);
 
         const levelUpEmbed = new EmbedBuilder()
