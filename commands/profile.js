@@ -6,15 +6,8 @@ module.exports = {
     .setName('profile')
     .setDescription('Shows your grower profile and inventory.'),
   async execute(interaction) {
-    // Find or create a user profile
-    let userProfile = await User.findOne({ userId: interaction.user.id });
-
-    if (!userProfile) {
-      userProfile = await User.create({
-        userId: interaction.user.id,
-        username: interaction.user.username,
-      });
-    }
+    // Find or create a user profile [UPDATED] More robust
+    const userProfile = await User.findOneAndUpdate({ userId: interaction.user.id }, { $setOnInsert: { username: interaction.user.username } }, { upsert: true, new: true });
 
     const inventoryList = userProfile.inventory.map(item => `**${item.name}** (x${item.quantity})`).join('\n');
 
@@ -25,7 +18,7 @@ module.exports = {
       .setThumbnail(interaction.user.displayAvatarURL())
       .addFields(
         { name: '🌿 Level', value: `\`${userProfile.level}\``, inline: true },
-        { name: '✨ XP', value: `\`${user.Profile.xp}\``, inline: true },
+        { name: '✨ XP', value: `\`${userProfile.xp}\``, inline: true },
         { name: '💰 Coins', value: `\`${userProfile.coins}\``, inline: true },
         { name: '🌱 Plots', value: `\`${userProfile.plots.length}\` available plots.`, inline: false},
         { name: '🎒 Inventory', value: userProfile.inventory.length > 0 ? inventoryList : 'Empty', inline: false },
