@@ -73,7 +73,7 @@ module.exports = {
                     )
                 // --- ADDING QUANTITY OPTION BACK ---
                 .addIntegerOption(option =>
-                    option.setName('quantity').setDescription('The amount you want to sell. Defaults to 1.'))
+                    option.setName('quantity').setDescription('The amount you want to buy. Defaults to 1.'))
                 )
         .addSubcommand(subcommand =>
             subcommand
@@ -119,10 +119,11 @@ module.exports = {
         
         else if (subcommand === 'buy') {
             const itemId = interaction.options.getString('item');
-            const quantity = 1;
+            const quantity = interaction.options.getInteger('quantity') || 1; // Use the provided quantity, or default to 1
             const item = allItems.get(itemId);
 
             if (!item) return interaction.editReply('That item does not exist!');
+            if (quantity <= 0) return interaction.editReply('You must buy at least 1 item.');
 
             const totalCost = item.price * quantity;
             if (userProfile.coins < totalCost) return interaction.editReply(`You need ${totalCost} coins, but only have ${userProfile.coins}.`);
@@ -141,10 +142,11 @@ module.exports = {
         
         else if (subcommand === 'sell') {
             const itemId = interaction.options.getString('item');
-            const quantity = 1;
+            const quantity = interaction.options.getInteger('quantity') || 1; // Use the provided quantity, or default to 1
             const itemData = allItems.get(itemId);
 
             if (!itemData || !itemData.sellPrice) return interaction.editReply("This item cannot be sold.");
+            if (quantity <= 0) return interaction.editReply('You must sell at least 1 item.');
 
             const itemInInventory = userProfile.inventory.find(i => i.name === itemData.name);
             if (!itemInInventory) return interaction.editReply("You don't have that item to sell.");
