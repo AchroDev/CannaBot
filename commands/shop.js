@@ -1,18 +1,40 @@
 const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const User = require('../models/User');
-const allItems = require('../data/items'); // Import the new master item list
+const allItems = require('../data/items');
 
 module.exports = {
     // --- Autocomplete Handler ---
 	async autocomplete(interaction) {
-		const focusedValue = interaction.options.getFocused();
+		const focusedOption = interaction.options.getFocused(true);
+        const subcommand = interaction.options.getSubcommand();
 		const choices = [];
-		allItems.forEach(item => {
-			if (item.name.toLowerCase().includes(focusedValue.toLowerCase())) {
-				choices.push({ name: item.name, value: item.id });
-			}
-		});
-		// Discord's API has a limit of 25 choices
+
+        if (subcommand === 'sell') {
+            const userProfile = await User.findOne({ userId: interaction.user.id });
+            if (!userProfile) return interaction.respond([]);
+
+            userProfile.inventory.forEach(item => {
+                const itemData = Array.from(allItems.values()).find(i => i.name === item.name);
+                if (itemData && item.name.toLowerCase().includes(focusedOption.value.toLowerCase())) {
+                    choices.push({ name: item.name, value: itemData.id });
+                }
+            });
+        } 
+        else if (subcommand === 'buy') {
+            // --- THIS IS THE NEW LOGIC ---
+            // First, get the category the user has already selected.
+            const category = interaction.options.getString('category');
+            if (!category) return; // If no category is selected yet, show no options.
+
+            // Filter all items by the selected category and the user's typing.
+            allItems.forEach(item => {
+                if (item.type === category && item.name.toLowerCase().includes(focusedOption.value.toLowerCase())) {
+                    choices.push({ name: item.name, value: item.id });
+                }
+            });
+        }
+        
+        // Discord's API has a limit of 25 choices
 		await interaction.respond(choices.slice(0, 25));
 	},
 
@@ -22,6 +44,7 @@ module.exports = {
         .addSubcommand(subcommand =>
             subcommand
                 .setName('list')
+                // ... (list subcommand is unchanged)
                 .setDescription('List all available items for sale.')
                 .addStringOption(option => 
                     option.setName('category')
@@ -35,28 +58,34 @@ module.exports = {
             subcommand
                 .setName('buy')
                 .setDescription('Buy an item from the shop.')
+                // --- THIS SUBCOMMAND HAS CHANGED ---
+                .addStringOption(option => 
+                    option.setName('category')
+                    .setDescription('The category of the item to buy.')
+                    .setRequired(true)
+                    .addChoices(
+                        { name: 'Seeds', value: 'seed' },
+                        { name: 'Nutrients', value: 'nutrient' }
+                    ))
                 .addStringOption(option =>
                     option.setName('item')
-                        .setDescription('Start typing to see available items.')
+                        .setDescription('The item to buy from the selected category.')
                         .setRequired(true)
-                        .setAutocomplete(true)) // Enable autocomplete
-                .addIntegerOption(option =>
-                    option.setName('quantity')
-                        .setDescription('How many to buy.')))
+                        .setAutocomplete(true)))
         .addSubcommand(subcommand =>
             subcommand
                 .setName('sell')
+                // ... (sell subcommand is unchanged)
                 .setDescription('Sell an item from your inventory.')
                 .addStringOption(option =>
                     option.setName('item')
                         .setDescription('Start typing to see sellable items.')
                         .setRequired(true)
-                        .setAutocomplete(true)) // Enable autocomplete
-                .addIntegerOption(option =>
-                    option.setName('quantity')
-                        .setDescription('How many to sell.'))),
+                        .setAutocomplete(true))),
 
     async execute(interaction) {
+        // The execute function remains the same as it correctly handles the logic
+        // based on the item ID provided by the autocomplete.
         await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
         const userProfile = await User.findOneAndUpdate({ userId: interaction.user.id }, { $setOnInsert: { username: interaction.user.username } }, { upsert: true, new: true });
         const subcommand = interaction.options.getSubcommand();
@@ -82,7 +111,7 @@ module.exports = {
         
         else if (subcommand === 'buy') {
             const itemId = interaction.options.getString('item');
-            const quantity = interaction.options.getInteger('quantity') || 1;
+            const quantity = 1;
             const item = allItems.get(itemId);
 
             if (!item) return interaction.editReply('That item does not exist!');
@@ -104,7 +133,7 @@ module.exports = {
         
         else if (subcommand === 'sell') {
             const itemId = interaction.options.getString('item');
-            const quantity = interaction.options.getInteger('quantity') || 1;
+            const quantity = 1;
             const itemData = allItems.get(itemId);
 
             if (!itemData || !itemData.sellPrice) return interaction.editReply("This item cannot be sold.");
