@@ -6,7 +6,7 @@ const connectDB = require('./utils/db'); // Moved here to prevent race condition
 
 // Create a new client instance
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds] // We don't need message content intent anymore!
+  intents: [GatewayIntentBits.Guilds]
 });
 
 // --- COMMAND HANDLER ---
@@ -38,33 +38,11 @@ for (const file of eventFiles) {
 	}
 }
 
-// --- DYNAMICALLY HANDLE COMMANDS ---
-client.on(Events.InteractionCreate, async interaction => {
-  if (!interaction.isChatInputCommand()) return;
-
-  const command = interaction.client.commands.get(interaction.commandName);
-
-  if (!command) {
-    console.error(`No command matching ${interaction.commandName} was found.`);
-    return;
-  }
-
-  try {
-    await command.execute(interaction);
-  } catch (error) {
-    console.error(error);
-    if (interaction.replied || interaction.deferred) {
-      await interaction.followUp({ content: 'There was an error while executing this command!', ephemeral: true });
-    } else {
-      await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
-    }
-  }
-});
-
 // Main function to start the bot
 const start = async () => {
   try {
     // First, connect to the database
+    console.log('Connecting to MongoDB...');
     await connectDB();
     
     // THEN, log in to Discord
