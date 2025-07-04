@@ -25,6 +25,6 @@ module.exports = {
       )
       .setTimestamp();
 
-    await interaction.reply({ embeds: [profileEmbed], ephemeral: true });
+    await interaction.reply({ embeds: [profileEmbed],  flags: [MessageFlags.Ephemeral] }); // Updated ephemeral flag
   },
 };
