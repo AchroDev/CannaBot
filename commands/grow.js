@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder,EmbedBuilder, MessageFlags } = require('discord.js');
 const User = require('../models/User');
 const allItems = require('../data/items');
 // --- Import the new experience utility ---
@@ -23,7 +23,12 @@ module.exports = {
                 .addIntegerOption(option => 
                     option.setName('plot')
                     .setDescription('The plot number to harvest from.')
-                    .setRequired(true))),
+                    .setRequired(true)))
+        // --- ADDING THE NEW STATUS SUBCOMMAND ---
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('status')
+                .setDescription('Check the status of your grow plots.')),
     
     // Autocomplete handler for the 'plant' subcommand
     // --- THIS IS THE CORRECTED AUTOCOMPLETE HANDLER ---
@@ -52,8 +57,9 @@ module.exports = {
 
     async execute(interaction) {
         const userProfile = await User.findOneAndUpdate({ userId: interaction.user.id }, { $setOnInsert: { username: interaction.user.username } }, { upsert: true, new: true });
+        const subcommand = interaction.options.getSubcommand();
 
-        if (interaction.options.getSubcommand() === 'plant') {
+        if (subcommand === 'plant') {
             const seedId = interaction.options.getString('seed');
             const seedData = allItems.get(seedId);
 
@@ -89,7 +95,7 @@ module.exports = {
             return interaction.reply(`You've planted **${seedData.name}** in plot ${plotIndex + 1}. It will be ready <t:${Math.floor(readyTime.getTime() / 1000)}:R>.`);
         } 
         
-        else if (interaction.options.getSubcommand() === 'harvest') {
+        else if (subcommand === 'harvest') {
             await interaction.deferReply(); // Defer reply as leveling up can send its own message.
             const plotNumber = interaction.options.getInteger('plot');
             const plotIndex = plotNumber - 1;
@@ -130,6 +136,38 @@ module.exports = {
             await userProfile.save();
 
             return interaction.editReply(`You harvested your **${plantData.name}** and received ${reward} coins and ${xpGained} XP!`);
+        }
+
+        // --- LOGIC FOR THE NEW STATUS SUBCOMMAND ---
+        else if (subcommand === 'status') {
+            await interaction.deferReply({ ephemeral: true });
+
+            if (!userProfile.plots || userProfile.plots.length === 0) {
+                return interaction.editReply("You don't have any grow plots yet. Try planting a seed!");
+            }
+
+            const statusEmbed = new EmbedBuilder()
+                .setColor('#2ECC71')
+                .setTitle(`${interaction.user.username}'s Grow Plots`);
+
+            userProfile.plots.forEach((plot, index) => {
+                let plotStatus;
+                if (plot.hasPlant) {
+                    const plantData = allItems.get(plot.plantId);
+                    const harvestReadyTime = new Date(plot.plantedAt.getTime() + plantData.growTime);
+                    
+                    if (new Date() >= harvestReadyTime) {
+                        plotStatus = `**${plantData.name}**\n✅ Ready to Harvest!`;
+                    } else {
+                        plotStatus = `**${plantData.name}**\nReady <t:${Math.floor(harvestReadyTime.getTime() / 1000)}:R>`;
+                    }
+                } else {
+                    plotStatus = "Empty 🌱";
+                }
+                statusEmbed.addFields({ name: `Plot ${index + 1}`, value: plotStatus, inline: true });
+            });
+
+            return interaction.editReply({ embeds: [statusEmbed] });
         }
     },
 };
