@@ -1,90 +1,127 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const User = require('../models/User');
-const plants = require('../utils/plants'); // Import our plant data
+const allItems = require('../data/items'); // Import the new master item list
 
 module.exports = {
+    // --- Autocomplete Handler ---
+	async autocomplete(interaction) {
+		const focusedValue = interaction.options.getFocused();
+		const choices = [];
+		allItems.forEach(item => {
+			if (item.name.toLowerCase().includes(focusedValue.toLowerCase())) {
+				choices.push({ name: item.name, value: item.id });
+			}
+		});
+		// Discord's API has a limit of 25 choices
+		await interaction.respond(choices.slice(0, 25));
+	},
+
     data: new SlashCommandBuilder()
         .setName('shop')
-        .setDescription('Buy and sell goods.')
+        .setDescription('Buy and sell goods from the store.')
         .addSubcommand(subcommand =>
             subcommand
                 .setName('list')
-                .setDescription('List all available seeds for sale.'))
+                .setDescription('List all available items for sale.')
+                .addStringOption(option => 
+                    option.setName('category')
+                    .setDescription('Filter by item category.')
+                    .setRequired(false)
+                    .addChoices(
+                        { name: 'Seeds', value: 'seed' },
+                        { name: 'Nutrients', value: 'nutrient' }
+                    )))
         .addSubcommand(subcommand =>
             subcommand
                 .setName('buy')
-                .setDescription('Buy a seed from the shop.')
-                .addStringOption(option => {
-                    option.setName('seed').setDescription('The name of the seed to buy.').setRequired(true);
-                    // Dynamically add choices from our plants file
-                    for (const plantKey in plants) {
-                        option.addChoices({ name: plants[plantKey].seedName, value: plantKey });
-                    }
-                    return option;
-                })
+                .setDescription('Buy an item from the shop.')
+                .addStringOption(option =>
+                    option.setName('item')
+                        .setDescription('Start typing to see available items.')
+                        .setRequired(true)
+                        .setAutocomplete(true)) // Enable autocomplete
                 .addIntegerOption(option =>
                     option.setName('quantity')
-                        .setDescription('How many seeds to buy.')
-                        .setRequired(false))) // Optional, defaults to 1
+                        .setDescription('How many to buy.')))
         .addSubcommand(subcommand =>
             subcommand
                 .setName('sell')
                 .setDescription('Sell an item from your inventory.')
-                // We will build this out later
-        ),
+                .addStringOption(option =>
+                    option.setName('item')
+                        .setDescription('Start typing to see sellable items.')
+                        .setRequired(true)
+                        .setAutocomplete(true)) // Enable autocomplete
+                .addIntegerOption(option =>
+                    option.setName('quantity')
+                        .setDescription('How many to sell.'))),
 
     async execute(interaction) {
-        await interaction.deferReply({ ephemeral: true }); // Acknowledge the command, gives us time to work
+        await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
         const userProfile = await User.findOneAndUpdate({ userId: interaction.user.id }, { $setOnInsert: { username: interaction.user.username } }, { upsert: true, new: true });
-
         const subcommand = interaction.options.getSubcommand();
 
         if (subcommand === 'list') {
+            const category = interaction.options.getString('category');
             const shopEmbed = new EmbedBuilder()
-                .setTitle('🌱 CannaBot Seed Shop 🌱')
-                .setColor('#5865F2')
-                .setDescription('Use `/shop buy` to purchase seeds.');
+                .setTitle('🌱 CannaBot Shop 🌱')
+                .setColor('#5865F2');
 
-            // Add a seasonal item for fun!
-            shopEmbed.addFields({ name: `🎆 **Freedom Bloom Seed** (Seasonal!)`, value: `Price: 75 coins` });
+            const itemsToList = category ? Array.from(allItems.values()).filter(i => i.type === category) : Array.from(allItems.values());
 
-            for (const plantKey in plants) {
-                const plant = plants[plantKey];
-                shopEmbed.addFields({ name: `**${plant.seedName}**`, value: `Price: ${plant.seedPrice} coins` });
+            if (itemsToList.length === 0) {
+                 shopEmbed.setDescription("No items found in this category.");
+            } else {
+                itemsToList.forEach(item => {
+                    const fieldName = item.id === "freedom_bloom" ? `🎆 **${item.name}** (Seasonal!)` : `**${item.name}**`;
+                    shopEmbed.addFields({ name: fieldName, value: `*${item.description}*\nPrice: ${item.price} coins` });
+                });
             }
-
             return interaction.editReply({ embeds: [shopEmbed] });
-        } else if (subcommand === 'buy') {
-            const seedKey = interaction.options.getString('seed');
+        }
+        
+        else if (subcommand === 'buy') {
+            const itemId = interaction.options.getString('item');
             const quantity = interaction.options.getInteger('quantity') || 1;
-            const plant = plants[seedKey];
+            const item = allItems.get(itemId);
 
-            if (!plant) {
-                return interaction.editReply('That seed does not exist!');
-            }
+            if (!item) return interaction.editReply('That item does not exist!');
 
-            const totalCost = plant.seedPrice * quantity;
+            const totalCost = item.price * quantity;
+            if (userProfile.coins < totalCost) return interaction.editReply(`You need ${totalCost} coins, but only have ${userProfile.coins}.`);
 
-            if (userProfile.coins < totalCost) {
-                return interaction.editReply(`You do not have enough coins. You need ${totalCost} coins, but you only have ${userProfile.coins}.`);
-            }
-
-            // Subtract coins
             userProfile.coins -= totalCost;
-
-            // Add item to inventory
-            const itemIndex = userProfile.inventory.findIndex(item => item.name === plant.seedName);
+            const itemIndex = userProfile.inventory.findIndex(i => i.name === item.name);
             if (itemIndex > -1) {
-                // Item exists, increment quantity
                 userProfile.inventory[itemIndex].quantity += quantity;
             } else {
-                // Item does not exist, add new item
-                userProfile.inventory.push({ name: plant.seedName, quantity: quantity });
+                userProfile.inventory.push({ name: item.name, quantity: quantity });
             }
 
             await userProfile.save();
-            return interaction.editReply(`You have successfully purchased ${quantity}x **${plant.seedName}** for ${totalCost} coins.`);
+            return interaction.editReply(`You bought ${quantity}x **${item.name}** for ${totalCost} coins.`);
         }
-        // We will add the 'sell' logic later
+        
+        else if (subcommand === 'sell') {
+            const itemId = interaction.options.getString('item');
+            const quantity = interaction.options.getInteger('quantity') || 1;
+            const itemData = allItems.get(itemId);
+
+            if (!itemData || !itemData.sellPrice) return interaction.editReply("This item cannot be sold.");
+
+            const itemInInventory = userProfile.inventory.find(i => i.name === itemData.name);
+            if (!itemInInventory) return interaction.editReply("You don't have that item to sell.");
+            if (itemInInventory.quantity < quantity) return interaction.editReply(`You only have ${itemInInventory.quantity}x ${itemData.name}.`);
+            
+            const totalGain = itemData.sellPrice * quantity;
+            userProfile.coins += totalGain;
+            itemInInventory.quantity -= quantity;
+            if (itemInInventory.quantity <= 0) {
+                userProfile.inventory = userProfile.inventory.filter(i => i.name !== itemData.name);
+            }
+            
+            await userProfile.save();
+            return interaction.editReply(`You sold ${quantity}x **${itemData.name}** for ${totalGain} coins!`);
+        }
     },
 };
