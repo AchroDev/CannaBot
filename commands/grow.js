@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const User = require('../models/User');
 const allItems = require('../data/items');
 // --- Import the new experience utility ---
@@ -46,17 +46,17 @@ module.exports = {
             const seedData = allItems.get(seedId);
 
             if (!seedData || seedData.type !== 'seed') {
-                return interaction.reply({ content: 'That is not a valid seed.', ephemeral: true });
+                return interaction.reply({ content: 'That is not a valid seed.', flags: [MessageFlags.Ephemeral] });
             }
 
             const seedInInventory = userProfile.inventory.find(i => i.name === seedData.name);
             if (!seedInInventory || seedInInventory.quantity < 1) {
-                return interaction.reply({ content: `You don't have any ${seedData.name} to plant!`, ephemeral: true });
+                return interaction.reply({ content: `You don't have any ${seedData.name} to plant!`, flags: [MessageFlags.Ephemeral] });
             }
 
             const plotIndex = userProfile.plots.findIndex(p => !p.hasPlant);
             if (plotIndex === -1) {
-                return interaction.reply({ content: 'You have no empty plots!', ephemeral: true });
+                return interaction.reply({ content: 'You have no empty plots!', flags: [MessageFlags.Ephemeral] });
             }
 
             // Consume one seed
@@ -83,7 +83,7 @@ module.exports = {
             const plotIndex = plotNumber - 1;
 
             if (!userProfile.plots[plotIndex] || !userProfile.plots[plotIndex].hasPlant) {
-                return interaction.editReply({ content: 'There is no plant in that plot.', ephemeral: true });
+                return interaction.editReply({ content: 'There is no plant in that plot.', flags: [MessageFlags.Ephemeral] });
             }
 
             const plot = userProfile.plots[plotIndex];
@@ -91,7 +91,7 @@ module.exports = {
             const harvestReadyTime = new Date(plot.plantedAt.getTime() + plantData.growTime);
 
             if (new Date() < harvestReadyTime) {
-                return interaction.editReply({ content: `Your **${plantData.name}** isn't ready yet! It will be ready <t:${Math.floor(harvestReadyTime.getTime() / 1000)}:R>.`, ephemeral: true });
+                return interaction.editReply({ content: `Your **${plantData.name}** isn't ready yet! It will be ready <t:${Math.floor(harvestReadyTime.getTime() / 1000)}:R>.`, flags: [MessageFlags.Ephemeral] });
             }
             
             // --- THIS IS THE NEW LOGIC ---
