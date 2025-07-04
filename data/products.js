@@ -5,7 +5,7 @@ module.exports = {
         name: "OG Kush Bud",
         description: "A harvested bud of OG Kush.",
         // No `price` because you can't buy it, only `sellPrice`.
-        sellPrice: 15 
+        sellPrice: 30 
     },
     blue_dream_bud: {
         id: "blue_dream_bud",
