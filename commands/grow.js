@@ -26,15 +26,27 @@ module.exports = {
                     .setRequired(true))),
     
     // Autocomplete handler for the 'plant' subcommand
+    // --- THIS IS THE CORRECTED AUTOCOMPLETE HANDLER ---
     async autocomplete(interaction) {
 		const focusedValue = interaction.options.getFocused();
+        // Find the user's profile to check their inventory
+        const userProfile = await User.findOne({ userId: interaction.user.id });
+        if (!userProfile) {
+            return interaction.respond([]); // If no profile, no suggestions
+        }
+
 		const choices = [];
-		allItems.forEach(item => {
-            // Show only items of type 'seed' in the choices
-			if (item.type === 'seed' && item.name.toLowerCase().includes(focusedValue.toLowerCase())) {
-				choices.push({ name: item.name, value: item.id });
-			}
-		});
+        // Iterate through the user's inventory
+        userProfile.inventory.forEach(item => {
+            // Find the full item data from our master list
+            const itemData = Array.from(allItems.values()).find(i => i.name === item.name);
+            
+            // Check if the item is a seed and matches the user's typing
+            if (itemData && itemData.type === 'seed' && item.name.toLowerCase().includes(focusedValue.toLowerCase())) {
+                choices.push({ name: item.name, value: itemData.id });
+            }
+        });
+        
 		await interaction.respond(choices.slice(0, 25));
 	},
 
