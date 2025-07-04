@@ -16,6 +16,8 @@ module.exports = {
       });
     }
 
+    const inventoryList = userProfile.inventory.map(item => `**${item.name}** (x${item.quantity})`).join('\n');
+
     // Create a nice embed to display the profile
     const profileEmbed = new EmbedBuilder()
       .setColor('#4CAF50') // A nice green color
@@ -26,7 +28,7 @@ module.exports = {
         { name: '✨ XP', value: `\`${user.Profile.xp}\``, inline: true },
         { name: '💰 Coins', value: `\`${userProfile.coins}\``, inline: true },
         { name: '🌱 Plots', value: `\`${userProfile.plots.length}\` available plots.`, inline: false},
-        { name: '🎒 Inventory', value: userProfile.inventory.length > 0 ? userProfile.inventory.join(', ') : 'Empty', inline: false },
+        { name: '🎒 Inventory', value: userProfile.inventory.length > 0 ? inventoryList : 'Empty', inline: false },
       )
       .setTimestamp();
 
