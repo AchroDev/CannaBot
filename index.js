@@ -12,11 +12,11 @@ client.once('ready', () => {
 client.on('messageCreate', message => {
   if (message.author.bot) return;
 
-  if (message.content === '!ping') {
+  if (message.content === '/ping') {
     message.reply('🌱 Pong! The grow lights are humming.');
   }
 
-  if (message.content === '!smoke') {
+  if (message.content === '/smoke') {
     message.reply('💨 You light up some sticky icky and chill out...');
   }
 });
