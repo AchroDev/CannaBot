@@ -14,8 +14,9 @@ module.exports = {
             if (!userProfile) return interaction.respond([]);
 
             userProfile.inventory.forEach(item => {
+                // Find the item data from the master list by its name
                 const itemData = Array.from(allItems.values()).find(i => i.name === item.name);
-                if (itemData && item.name.toLowerCase().includes(focusedOption.value.toLowerCase())) {
+                if (itemData && itemData.sellPrice && item.name.toLowerCase().includes(focusedOption.value.toLowerCase())) {
                     choices.push({ name: item.name, value: itemData.id });
                 }
             });
@@ -28,7 +29,7 @@ module.exports = {
 
             // Filter all items by the selected category and the user's typing.
             allItems.forEach(item => {
-                if (item.type === category && item.name.toLowerCase().includes(focusedOption.value.toLowerCase())) {
+                if (item.price && item.type === category && item.name.toLowerCase().includes(focusedOption.value.toLowerCase())) {
                     choices.push({ name: item.name, value: item.id });
                 }
             });
