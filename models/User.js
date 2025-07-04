@@ -10,7 +10,12 @@ const userSchema = new mongoose.Schema({
     name: String,
     quantity: Number,
   }],
-  plots: { type: Array, default: [{ hasPlant: false, plantType: null, plantedAt: null }] },
+  plots: { type: Array, default: [{ 
+    hasPlant: false, 
+    plantType: null, 
+    plantedAt: null,
+    lastWatered: null 
+  }] },
   lastDaily: { type: Date, default: null } // Adding this now for our next step
 });
 
