@@ -37,6 +37,10 @@ for (const file of eventFiles) {
 	}
 }
 
+const connectDB = require('./utils/db');
+// Connect to Database
+connectDB();
+
 // --- DYNAMICALLY HANDLE COMMANDS ---
 client.on(Events.InteractionCreate, async interaction => {
   if (!interaction.isChatInputCommand()) return;
