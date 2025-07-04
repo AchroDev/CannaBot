@@ -2,6 +2,7 @@ require('dotenv').config();
 const fs = require('node:fs');
 const path = require('node:path');
 const { Client, Collection, Events, GatewayIntentBits } = require('discord.js');
+const connectDB = require('./utils/db'); // Moved here to prevent race condition
 
 // Create a new client instance
 const client = new Client({
@@ -37,10 +38,6 @@ for (const file of eventFiles) {
 	}
 }
 
-const connectDB = require('./utils/db');
-// Connect to Database
-connectDB();
-
 // --- DYNAMICALLY HANDLE COMMANDS ---
 client.on(Events.InteractionCreate, async interaction => {
   if (!interaction.isChatInputCommand()) return;
@@ -64,5 +61,20 @@ client.on(Events.InteractionCreate, async interaction => {
   }
 });
 
-// Log in to Discord with your client's token
-client.login(process.env.DISCORD_TOKEN);
+// Main function to start the bot
+const start = async () => {
+  try {
+    // First, connect to the database
+    await connectDB();
+    
+    // THEN, log in to Discord
+    console.log('Logging in to Discord...');
+    await client.login(process.env.DISCORD_TOKEN);
+
+  } catch (error) {
+    console.error("Failed to start the bot:");
+    console.error(error);
+  }
+};
+
+start();
