@@ -1,4 +1,4 @@
-const { SlashCommandBuilder,EmbedBuilder, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, MessageFlags } = require('discord.js');
 const User = require('../models/User');
 const allItems = require('../data/items');
 // --- Import the new experience utility ---
@@ -168,26 +168,68 @@ module.exports = {
 
             const statusEmbed = new EmbedBuilder()
                 .setColor('#2ECC71')
-                .setTitle(`${interaction.user.username}'s Grow Plots`);
+                .setTitle(`${interaction.user.username}'s Grow Plots`)
+                .setDescription('Manage your garden from here. Plants will die if not watered within 24 hours!');
 
-            userProfile.plots.forEach((plot, index) => {
+            const componentRows = [];
+
+            for (let i = 0; i < userProfile.plots.lenth; i++) {
+                const plot = userProfile.plots[i];
+
                 let plotStatus;
+                // Create a new row of buttons for each plot
+                const actionRow = new ActionRowBuilder();
+
                 if (plot.hasPlant) {
                     const plantData = allItems.get(plot.plantId);
-                    const harvestReadyTime = new Date(plot.plantedAt.getTime() + plantData.growTime);
+                    const harvestReadyTime = new Date(new Date(plot.plantedAt).getTime() + plantData.growTime);
+                    const isReady = new Date() >= harvestReadyTime;
                     
-                    if (new Date() >= harvestReadyTime) {
-                        plotStatus = `**${plantData.name}**\n✅ Ready to Harvest!`;
-                    } else {
-                        plotStatus = `**${plantData.name}**\nReady <t:${Math.floor(harvestReadyTime.getTime() / 1000)}:R>`;
-                    }
+                    // Determine watering status
+                    const witherTime = 24 * 60 * 60 * 1000;
+                    const timeSinceWatered = Date.now() - new Date(plot.lastWatered).getTime();
+                    const needsWater = timeSinceWatered > witherTime / 2; // Example: show water button if >12 hours have passed
+
+                    plotStatus = `**${plantData.name}**\n`;
+                    plotStatus += isReady ? "✅ Ready to Harvest!" : `Ready <t:${Math.floor(harvestReadyTime.getTime() / 1000)}:R>`;
+
+                    // Water Button
+                    actionRow.addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(`water-${i}`) // e.g., water-0
+                            .setLabel('Water')
+                            .setStyle(ButtonStyle.Primary)
+                            .setEmoji('💧')
+                            .setDisabled(!needsWater) // Disable if recently watered
+                    );
+
+                    // Harvest Button
+                    actionRow.addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(`harvest-${i}`) // e.g., harvest-0
+                            .setLabel('Harvest')
+                            .setStyle(ButtonStyle.Success)
+                            .setEmoji('🧑‍🌾')
+                            .setDisabled(!isReady) // Disable if not ready
+                    );
+
                 } else {
                     plotStatus = "Empty 🌱";
+                    // Plant Button (disabled for now, could be a future feature)
+                     actionRow.addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(`plant-${i}`)
+                            .setLabel('Plant')
+                            .setStyle(ButtonStyle.Secondary)
+                            .setEmoji('🌿')
+                            .setDisabled(true)
+                    );
                 }
-                statusEmbed.addFields({ name: `Plot ${index + 1}`, value: plotStatus, inline: true });
-            });
+                statusEmbed.addFields({ name: `Plot ${i + 1}`, value: plotStatus, inline: true });
+                componentRows.push(actionRow);
+            }
 
-            return interaction.editReply({ embeds: [statusEmbed] });
+            return interaction.editReply({ embeds: [statusEmbed], components: componentRows });
         }
 
         // Logic for watering plots
