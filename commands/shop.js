@@ -44,7 +44,6 @@ module.exports = {
         .addSubcommand(subcommand =>
             subcommand
                 .setName('list')
-                // ... (list subcommand is unchanged)
                 .setDescription('List all available items for sale.')
                 .addStringOption(option => 
                     option.setName('category')
@@ -58,7 +57,6 @@ module.exports = {
             subcommand
                 .setName('buy')
                 .setDescription('Buy an item from the shop.')
-                // --- THIS SUBCOMMAND HAS CHANGED ---
                 .addStringOption(option => 
                     option.setName('category')
                     .setDescription('The category of the item to buy.')
@@ -71,7 +69,12 @@ module.exports = {
                     option.setName('item')
                         .setDescription('The item to buy from the selected category.')
                         .setRequired(true)
-                        .setAutocomplete(true)))
+                        .setAutocomplete(true)
+                    )
+                // --- ADDING QUANTITY OPTION BACK ---
+                .addIntegerOption(option =>
+                    option.setName('quantity').setDescription('The amount you want to sell. Defaults to 1.'))
+                )
         .addSubcommand(subcommand =>
             subcommand
                 .setName('sell')
@@ -81,7 +84,12 @@ module.exports = {
                     option.setName('item')
                         .setDescription('Start typing to see sellable items.')
                         .setRequired(true)
-                        .setAutocomplete(true))),
+                        .setAutocomplete(true)
+                    )
+                // --- ADDING QUANTITY OPTION BACK ---
+                .addIntegerOption(option =>
+                    option.setName('quantity').setDescription('The amount you want to sell. Defaults to 1.'))
+                ),
 
     async execute(interaction) {
         // The execute function remains the same as it correctly handles the logic
