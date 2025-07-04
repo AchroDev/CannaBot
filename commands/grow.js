@@ -24,11 +24,18 @@ module.exports = {
                     option.setName('plot')
                     .setDescription('The plot number to harvest from.')
                     .setRequired(true)))
-        // --- ADDING THE NEW STATUS SUBCOMMAND ---
         .addSubcommand(subcommand =>
             subcommand
                 .setName('status')
-                .setDescription('Check the status of your grow plots.')),
+                .setDescription('Check the status of your grow plots.'))
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('water')
+                .setDescription('Water a plant in one of your plots.')
+                .addIntegerOption(option =>
+                    option.setName('plot')
+                    .setDescription('The plot number to water.')
+                    .setRequired(true))),
     
     // Autocomplete handler for the 'plant' subcommand
     // --- THIS IS THE CORRECTED AUTOCOMPLETE HANDLER ---
@@ -87,7 +94,8 @@ module.exports = {
             userProfile.plots[plotIndex] = {
                 hasPlant: true,
                 plantId: seedData.id, // Store the ID for easy lookup
-                plantedAt: new Date()
+                plantedAt: new Date(),
+                lastWatered: new Date()
             };
             
             const readyTime = new Date(Date.now() + seedData.growTime);
@@ -113,12 +121,23 @@ module.exports = {
                 return interaction.editReply({ content: `Your **${plantData.name}** isn't ready yet! It will be ready <t:${Math.floor(harvestReadyTime.getTime() / 1000)}:R>.`, flags: [MessageFlags.Ephemeral] });
             }
             
-            // --- THIS IS THE NEW LOGIC ---
             const reward = plantData.reward;
             const xpGained = plantData.xp;
             
             userProfile.coins += reward;
             userProfile.xp += xpGained;
+
+            // --- "DRIED & DIED" LOGIC ---
+            // Define a wither time in milliseconds (e.g., 24 hours)
+            const witherTime = 24 * 60 * 60 * 1000; 
+            const timeSinceWatered = Date.now() - new Date(plot.lastWatered).getTime();
+
+            if (timeSinceWatered > witherTime) {
+                // Clear the plot
+                userProfile.plots[plotIndex] = { hasPlant: false, plantId: null, plantedAt: null, lastWatered: null };
+                await userProfile.save();
+                return interaction.editReply(`Oh no! You forgot to water your **${plantData.name}**. It dried up and died. 🏜️`);
+            }
             
             const harvestedItemName = plantData.growsInto;
             const itemIndex = userProfile.inventory.findIndex(item => item.name === harvestedItemName);
@@ -139,7 +158,7 @@ module.exports = {
             return interaction.editReply(`You harvested your **${plantData.name}** and received ${reward} coins and ${xpGained} XP!`);
         }
 
-        // --- LOGIC FOR THE NEW STATUS SUBCOMMAND ---
+        // --- LOGIC FOR THE STATUS SUBCOMMAND ---
         else if (subcommand === 'status') {
             await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
@@ -169,6 +188,25 @@ module.exports = {
             });
 
             return interaction.editReply({ embeds: [statusEmbed] });
+        }
+
+        // Logic for watering plots
+        else if (subcommand === 'water') {
+            await interaction.deferReply({ ephemeral: true });
+            const plotNumber = interaction.options.getInteger('plot');
+            const plotIndex = plotNumber - 1;
+
+            const plot = userProfile.plots[plotIndex];
+            if (!plot || !plot.hasPlant) {
+                return interaction.editReply("There's no plant in that plot to water.");
+            }
+
+            // You could add a cooldown for watering here if you want
+            plot.lastWatered = new Date();
+            await userProfile.save();
+
+            const plantData = allItems.get(plot.plantId);
+            return interaction.editReply(`You watered your **${plantData.name}** in plot ${plotNumber}. It looks refreshed! 💧`);
         }
     },
 };
